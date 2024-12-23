@@ -307,6 +307,9 @@ def train_all_neural_models_for_all_tasks(data):
     neural_network_three_layered_mbgd.do_operations(save=True)
     print("[*] 3 katmanlı batch gd yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
   
+def eval_all_neural_models_for_all_tasks(data, model_filepath):
+    print("eval")
+    
 if __name__ == "__main__":
 
     print("[*] Now Training --- Neural Network ")
