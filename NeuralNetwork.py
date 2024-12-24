@@ -6,6 +6,8 @@ from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import SGD
 from matplotlib import pyplot as plt
 from dataset import generate_dataset, split_dataset
+import os
+import joblib
 
 class NeuralNetwork:
 
@@ -45,7 +47,10 @@ class NeuralNetwork:
     self.learning_rate = learning_rate
 
     # Modelin kaydedileceği dosyanın adını belirten değişken.
-    self.identifier = f"Neural_{self.num_hidden_layer}layered_{self.gradient_descent_method}.weights.h5"
+    self.identifier = f"Neural_{self.num_hidden_layer}layered_{self.gradient_descent_method}_{self.num_epochs}epoch.weights.h5"
+
+    # Modelin tarihçesinin kaydedileceği dosyanın adını belirten değişken.
+    self.log_file_name = f"Neural_{self.num_hidden_layer}layered_{self.gradient_descent_method}_{self.num_epochs}epoch.csv"
 
   def do_operations(self, save=False):
     """
@@ -87,7 +92,7 @@ class NeuralNetwork:
 
     if self.num_hidden_layer == 1:
       self.model = tf.keras.Sequential([
-          tf.keras.layers.Dense(32, activation='relu', input_shape=(self.X_train.shape[1],)),
+          tf.keras.layers.Dense(16, activation='relu', input_shape=(self.X_train.shape[1],)),
           tf.keras.layers.Dense(1, activation='sigmoid')
       ])
 
@@ -138,6 +143,29 @@ class NeuralNetwork:
 
     if visualize:
       plot_model(self.model, to_file=f"neural_network_{self.num_hidden_layer}_layered_{self.gradient_descent_method}.png", show_shapes=True, show_layer_names=True)
+
+    self.save_training_logs(self.log_file_name)
+
+  def save_training_logs(self, filename):
+      """
+      Eğitim süreci sırasında elde edilen kayıp (loss) ve doğruluk değerlerini bir dosyaya kaydeden fonksiyon.
+
+      Girdi:
+        filename (str): Logların kaydedileceği dosya ismi. (Örnek: 'training_logs.csv')
+
+      Çıktı:
+        Çıktısı yoktur. Eğitim loglarını belirtilen dosyaya yazar.
+      """
+      with open(filename, mode='w', newline='') as file:
+          writer = csv.writer(file)
+          writer.writerow(['Epoch', 'Train Loss', 'Train Accuracy', 'Validation Loss', 'Validation Accuracy'])
+
+          for epoch, (train_loss, train_acc, val_loss, val_acc) in enumerate(zip(
+              self.history.history['loss'], self.history.history['accuracy'],
+              self.history.history.get('val_loss', []), self.history.history.get('val_accuracy', []))):
+              writer.writerow([epoch + 1, train_loss, train_acc, val_loss, val_acc])
+
+      print(f"Eğitim logları '{filename}' dosyasına başarıyla kaydedildi.")
 
   def plot_epoch_loss_graph(self):
 
@@ -225,13 +253,8 @@ class NeuralNetwork:
       plt.tight_layout()
       plt.show()
 
-  def evaluate_on_test_data(self):
+  def eval(self):
 
-    """
-      Girdisi yoktur. 
-      Modeli test datası üzerinde evaluate eder.
-      Sonuçları yazdırır.
-    """
     print("Evaluate on test data")
     results = self.model.evaluate(self.X_test, self.y_test)
     print("test loss, test acc, precision, recall:", results)
@@ -266,49 +289,67 @@ class NeuralNetwork:
 
 
 def train_all_neural_models_for_all_tasks(data):
-  
-    # veri : 240 eğitim, 80 validasyon, 80 test
-    print("[1 Katman] Çalışmalar...")
-    neural_network_one_layered_sgd = NeuralNetwork(data,gradient_descent_method="sgd",learning_rate=0.01, num_epochs=30,num_hidden_layer=1,verbose=0)
-    neural_network_one_layered_sgd.do_operations(save=True)
-    print("[*] 1 katmanlı SGD yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
+    """
+    
+    Bu fonksiyon, ödevde istenen tüm taskların sırayla çalışması için hazırlanmıştır.
+    Sınıf fonksiyonu değildir, import edilip train.py dosyasında kullanılacaktır.
+    Aşağıda, SGD, Mini Batch ve Batch GD yöntemleriyle 1 katmanlı, 2 katmanlı ve 3 katmanlı
+    ağların eğitim kodları bulunmaktadır. 
+    
+    """
+    
+    save_dir = "train/neural"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        print(f"[+] Klasör oluşturuldu: {save_dir}")
 
-    neural_network_one_layered_mbgd = NeuralNetwork(data,gradient_descent_method="mini-batch", batch_size_for_mbgd=24, learning_rate=0.001, num_epochs=1000,num_hidden_layer=1,verbose=0)
-    neural_network_one_layered_mbgd.do_operations(save=True)
-    print("[*] 1 katmanlı Mini batch (64 batch size ile) gd yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
+    configurations = [
+        {"gradient_descent_method": "sgd", "num_hidden_layer": 1, "num_epochs": 30, "learning_rate": 0.01},
+        {"gradient_descent_method": "mini-batch", "num_hidden_layer": 1, "num_epochs": 100, "learning_rate": 0.001, "batch_size_for_mbgd": 32},
+        {"gradient_descent_method": "batch", "num_hidden_layer": 1, "num_epochs": 200, "learning_rate": 0.01},
+        {"gradient_descent_method": "sgd", "num_hidden_layer": 2, "num_epochs": 50, "learning_rate": 0.01},
+        {"gradient_descent_method": "mini-batch", "num_hidden_layer": 2, "num_epochs": 100, "learning_rate": 0.001, "batch_size_for_mbgd": 32},
+        {"gradient_descent_method": "batch", "num_hidden_layer": 2, "num_epochs": 200, "learning_rate": 0.01},
+        {"gradient_descent_method": "sgd", "num_hidden_layer": 3, "num_epochs": 100, "learning_rate": 0.01},
+        {"gradient_descent_method": "mini-batch", "num_hidden_layer": 3, "num_epochs": 300, "learning_rate": 0.001, "batch_size_for_mbgd": 32},
+        {"gradient_descent_method": "batch", "num_hidden_layer": 3, "num_epochs": 600, "learning_rate": 0.01}
+    ]
 
-    neural_network_one_layered_bgd = NeuralNetwork(data,gradient_descent_method="batch",learning_rate=0.01, num_epochs=2000,num_hidden_layer=1,verbose=0)
-    neural_network_one_layered_bgd.do_operations(save=True)
-    print("[*] 1 katmanlı batch gd yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
+    for config in configurations:
+        print(f"\n[*] {config['num_hidden_layer']} Katmanlı Ağ ({config['gradient_descent_method'].capitalize()} Gradient Descent)")
+        nn = NeuralNetwork(data, **config, verbose=1)
+        nn.do_operations(save=True)
+        print(f"[+] Ağırlıklar kaydedildi: {nn.identifier}")
+        
+        
+def eval_all_neural_models_for_all_tasks(data):
+    """
+    Kaydedilen ağırlıkları yükler ve test verisiyle değerlendirme yapar.
+    """
+    
+    save_dir = "train/neural"
 
-    print("[2 Katman] Çalışmalar...")
-    neural_network_two_layered_sgd = NeuralNetwork(data,gradient_descent_method="sgd",num_epochs=50,num_hidden_layer=2,verbose=0)
-    neural_network_two_layered_sgd.do_operations(save=True)
-    print("[*] 2 katmanlı SGD yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
+    model_files = [f for f in os.listdir(save_dir) if f.endswith('.h5')]
+    if not model_files:
+        raise FileNotFoundError(f"[!] Klasörde model dosyası bulunamadı: {save_dir}")
 
-    neural_network_two_layered_mbgd = NeuralNetwork(data,gradient_descent_method="mini-batch", batch_size_for_mbgd=64,num_epochs=300,num_hidden_layer=2, verbose=0)
-    neural_network_two_layered_mbgd.do_operations(save=True)
-    print("[*] 2 katmanlı Mini batch (30 batch size ile) gd yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
+    for model_file in model_files:
+        filepath = os.path.join(save_dir, model_file)
+        print(f"\n[*] Model Yükleniyor: {filepath}")
+        
+        
+        parts = model_file.replace('.weights.h5', '').split('_')
+        num_hidden_layer = int(parts[1][0])
+        gradient_descent_method = parts[2]
+        num_epochs = int(parts[3][0:-5])  # 'epoch' kısmını çıkart
 
-    neural_network_two_layered_bgd = NeuralNetwork(data,gradient_descent_method="batch",num_epochs=3000,num_hidden_layer=2, verbose=0)
-    neural_network_two_layered_bgd.do_operations(save=True)
-    print("[*] 2 katmanlı batch gd yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
+        nn = NeuralNetwork(data, gradient_descent_method=gradient_descent_method, num_hidden_layer=num_hidden_layer, num_epochs=num_epochs, verbose=1)
+        nn.create_model()
+        nn.model.load_weights(filepath)
+        print("[+] Ağırlıklar yüklendi.")
 
-    print("[3 Katman] Çalışmalar...")
-    neural_network_three_layered_sgd = NeuralNetwork(data,gradient_descent_method="sgd",num_epochs=1000,num_hidden_layer=3,verbose=0)
-    neural_network_three_layered_sgd.do_operations(save=True)
-    print("[*] 3 katmanlı SGD yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
-
-    neural_network_three_layered_mbgd = NeuralNetwork(data,gradient_descent_method="mini-batch", batch_size_for_mbgd=16,num_epochs=3000,num_hidden_layer=3, verbose=0)
-    neural_network_three_layered_mbgd.do_operations(save=True)
-    print("[*] 3 katmanlı Mini batch (30 batch size ile) gd yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
-
-    neural_network_three_layered_mbgd = NeuralNetwork(data,gradient_descent_method="batch",num_epochs=6000,num_hidden_layer=3, verbose=0)
-    neural_network_three_layered_mbgd.do_operations(save=True)
-    print("[*] 3 katmanlı batch gd yöntemiyle öğrenen ağ eğitimi tamamlandı. ")
-  
-def eval_all_neural_models_for_all_tasks(data, model_filepath):
-    print("eval")
+        print("\n[+] Test Seti Sonuçları:")
+        nn.eval()
     
 if __name__ == "__main__":
 
@@ -320,4 +361,5 @@ if __name__ == "__main__":
     print("[*] Data train, test ve validation olarak ayrıldı. ")
 
     # veri : 240 eğitim, 80 validasyon, 80 test
-    train_all_models_for_task(data)
+    train_all_neural_models_for_all_tasks(data)
+    eval_all_neural_models_for_all_tasks(data)

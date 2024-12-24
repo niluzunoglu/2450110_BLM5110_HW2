@@ -1,10 +1,12 @@
+from dataset import generate_dataset, split_dataset
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_moons
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.svm import SVC
 from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
-from dataset import generate_dataset, split_dataset
+import joblib
+import os
 
 class SupportVectorMachine:
 
@@ -106,7 +108,6 @@ class SupportVectorMachine:
         disp.plot()
         plt.show()
 
-
 def train_all_svm_models_for_all_tasks(data):
     
     """
@@ -121,13 +122,40 @@ def train_all_svm_models_for_all_tasks(data):
     """
     
     kernels = ['linear', 'poly', 'rbf']
+    
     for kernel in kernels:
         print(f"\nKernel: {kernel.upper()}")
         svm = SupportVectorMachine(data, kernel=kernel, verbose=1)
         svm.tune_hyperparameters()
         svm.plot_decision_boundary(title=f"SVM Decision Boundary ({kernel.upper()})")
-        svm.evaluate_model()
-    
+
+       # Model kaydetme
+        directory = "train/svm"
+        if not os.path.exists(directory):
+            os.makedirs(directory)  # Klasör yoksa oluştur
+            print(f"[+] Klasör oluşturuldu: {directory}")
+            
+        # Model kaydetme
+        filepath = f"train/svm/svm_{kernel}.joblib"
+        joblib.dump(svm.model, filepath)
+        print(f"[+] Model kaydedildi: {filepath}")
+        
+def eval_all_svm_models_for_all_tasks(data, model_filepaths):
+    for kernel, filepath in model_filepaths.items():
+        print(f"\nKernel: {kernel.upper()}")
+        print(f"Model yükleniyor: {filepath}")
+        model = joblib.load(filepath)
+        
+        # Test verileriyle değerlendirme
+        y_test_pred = model.predict(data["X_test"])
+        print(classification_report(data["y_test"], y_test_pred))
+        
+        cm = confusion_matrix(data["y_test"], y_test_pred)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+        disp.plot()
+        plt.title(f"Confusion Matrix ({kernel.upper()})")
+        plt.show()
+        
 if __name__ == "__main__":
     
     X,y = generate_dataset(noise=0.2, plot=False)
@@ -136,3 +164,10 @@ if __name__ == "__main__":
     print("[*] Data train, test ve validation olarak ayrıldı. ")
     
     train_all_svm_models_for_all_tasks(data)
+    
+    model_filepaths = {
+        "linear": "train/svm/svm_linear.joblib",
+        "poly": "train/svm/svm_poly.joblib",
+        "rbf": "train/svm/svm_rbf.joblib"
+    }
+    eval_all_svm_models_for_all_tasks(data, model_filepaths)    
